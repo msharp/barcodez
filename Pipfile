@@ -1,0 +1,16 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+zint = {editable = true,git = "http://github.com/msharp/python-zint.git",ref = "v1.2"}
+falcon = ">=2.0"
+pillow = "*"
+pypng = "*"
+gunicorn = "*"
+
+[requires]
+python_version = "3.7"
