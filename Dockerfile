@@ -52,7 +52,9 @@ RUN pipenv sync
 # Copy the rest of the app
 COPY . .
 
-CMD ["pipenv", "run", "gunicorn", "-b", "0.0.0.0:8000", "barcodez:api"]
+# the "--wsgi-disable-file-wrapper" option is to allow io.BytesIO objects
+# to be served by uwsgi (https://github.com/unbit/uwsgi/issues/1126)
+CMD ["pipenv", "run", "uwsgi", "--wsgi-disable-file-wrapper", "-c", "uwsgi.ini"]
 
 
 
