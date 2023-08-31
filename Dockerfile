@@ -1,6 +1,8 @@
 # Using lightweight alpine image
 FROM python:3.7-alpine
 
+EXPOSE 8000
+
 # install pipenv and create an app user
 RUN apk update \
       && apk add --no-cache git openssh-client \
@@ -54,7 +56,7 @@ COPY . .
 
 # the "--wsgi-disable-file-wrapper" option is to allow io.BytesIO objects
 # to be served by uwsgi (https://github.com/unbit/uwsgi/issues/1126)
-CMD ["pipenv", "run", "uwsgi", "--wsgi-disable-file-wrapper", "-c", "uwsgi.ini"]
+CMD ["pipenv", "run", "uwsgi", "--wsgi-disable-file-wrapper", "uwsgi.ini"]
 
 
 
