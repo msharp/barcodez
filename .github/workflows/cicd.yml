@@ -1,0 +1,70 @@
+name: CICD
+# List of Github events triggering the workflow
+on: [push, pull_request]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: endsWith( github.ref, '/master' ) || endsWith( github.ref, '/staging' )    
+    steps:      
+      - name: Slack Notification
+        if: endsWith( github.ref, '/master' )
+        uses: lazy-actions/slatify@v3.0.0
+        with:
+          type: ${{ job.status }}
+          job_name: "*Barcodez Deployment Started* > "
+          url: ${{ secrets.SLACK_WEBHOOK }}
+          commit: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+      - name: Configure AWS credentials
+        id: aws-credentials
+        uses: aws-actions/configure-aws-credentials@v2.2.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1        
+      - name: Set environment variables
+        run: |
+          echo "APP_ENVIRONMENT=$(if [[ "${GITHUB_REF##*/}" == "master" ]]; then echo "production"; \
+                                elif [[ "${GITHUB_REF##*/}" == "staging" ]]; then echo "staging"; fi)" >> $GITHUB_ENV
+          echo "DATE_TIMESTAMP=$(echo $(date +"%Y-%m-%dT%H%M%SZ"))" >> $GITHUB_ENV
+      # Use preceeding variables
+      - name: Set version tag
+        run: echo "IMAGE_TAG=${{ env.APP_ENVIRONMENT }}-${{ env.DATE_TIMESTAMP }}" >> $GITHUB_ENV
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: barcodez
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          docker build --build-arg GO_ENV=$APP_ENVIRONMENT -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"  
+      - name: Deploy to App Runner
+        id: deploy-apprunner
+        uses: awslabs/amazon-app-runner-deploy@v2.5.0
+        with:
+          service: barcodez-${{ env.APP_ENVIRONMENT }}
+          image: ${{ steps.build-image.outputs.image }}
+          access-role-arn: ${{ vars.ROLE_ARN }}
+          region: us-east-1
+          port: ${{ vars.SERVICE_DEFAULT_PORT }}
+          cpu: ${{ vars.SERVICE_DEFAULT_CPU }}
+          memory: ${{ vars.SERVICE_DEFAULT_MEMORY }}
+          # Control service stability timeout
+          wait-for-service-stability-seconds: 1200
+      - name: Slack Notification
+        uses: lazy-actions/slatify@v3.0.0
+        if: endsWith( github.ref, '/master' )
+        with:
+          type: ${{ job.status }}
+          job_name: "*Barcodez Deployment Completed* > "
+          url: ${{ secrets.SLACK_WEBHOOK }}

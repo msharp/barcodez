@@ -20,7 +20,14 @@ Or in the Docker container, with:
 
     docker run -p 8000:8000 barcodez
 
+## Deployment
 
+The application container is hosted on AWS [App Runner](https://aws.amazon.com/apprunner/). Internally a service is run on the AWS ECS/FARGATE container infrastructure. 
+App Runner adds an application load balancer as the entrypoint to access a service. 
 
+In order to deploy a new application version, following steps are actioned:
+- Build Docker image
+- Tag and push Docker image to ECR
+- Invoke an App Runner service update with new image version
 
-
+Run `./deploy.sh` locally and select your deployment environment, or push to remote staging for invoking a deployment on Github Actions. 
